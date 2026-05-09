@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LLMWiki.App/LLMWiki.App.csproj" />
+    <Project Path="src/LLMWiki.Core/LLMWiki.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LLMWiki.Tests/LLMWiki.Tests.csproj" />
+  </Folder>
+</Solution>

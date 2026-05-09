@@ -1,0 +1,7 @@
+<Project>
+  <!-- Barrier: stops upward inheritance of LLMWiki root Directory.Build.props.
+       The Claude Agent SDK is vendored as-is and uses its own per-csproj settings. -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+</Project>

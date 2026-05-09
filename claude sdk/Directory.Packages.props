@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Barrier: SDK keeps its own PackageReference Version attributes; do not enable CPM here. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

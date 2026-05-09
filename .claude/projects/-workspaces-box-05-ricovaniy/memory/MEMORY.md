@@ -1,0 +1,1 @@
+- [Stop after each checklist item](feedback_workflow.md) — пауза после каждого пункта чеклиста, ждать команды
