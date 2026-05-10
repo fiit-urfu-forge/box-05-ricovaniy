@@ -330,7 +330,12 @@ public class SubprocessCliTransport : ITransport
                 RedirectStandardError = true, // Always redirect stderr for debugging
                 UseShellExecute = false,
                 CreateNoWindow = true,
-                WorkingDirectory = _cwd ?? Environment.CurrentDirectory
+                WorkingDirectory = _cwd ?? Environment.CurrentDirectory,
+                // Claude Code emits UTF-8 JSON; default Windows console code page
+                // (cp1251 / cp866 in CIS locales) garbles non-ASCII output.
+                StandardInputEncoding = new UTF8Encoding(false),
+                StandardOutputEncoding = new UTF8Encoding(false),
+                StandardErrorEncoding = new UTF8Encoding(false),
             };
 
             foreach (var arg in args)
@@ -345,6 +350,11 @@ public class SubprocessCliTransport : ITransport
             }
             startInfo.Environment["CLAUDE_CODE_ENTRYPOINT"] = "sdk-dotnet";
             startInfo.Environment["CLAUDE_AGENT_SDK_VERSION"] = SdkVersion;
+            // Force UTF-8 in the child process (Node.js, npm shim) so non-ASCII
+            // content (Cyrillic, emoji) survives the stdout pipe on Windows.
+            startInfo.Environment["LANG"] = "en_US.UTF-8";
+            startInfo.Environment["LC_ALL"] = "en_US.UTF-8";
+            startInfo.Environment["PYTHONIOENCODING"] = "utf-8";
 
             if (_cwd != null)
                 startInfo.Environment["PWD"] = _cwd;

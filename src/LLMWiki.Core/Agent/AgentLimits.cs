@@ -8,9 +8,9 @@ public static class AgentLimits
 
     public const int QueryMaxTurns = 50;
 
-    public static readonly TimeSpan ClaudeTimeout = TimeSpan.FromMinutes(5);
+    public static readonly TimeSpan ClaudeTimeout = TimeSpan.FromMinutes(15);
 
-    public static readonly TimeSpan StalledStreamTimeout = TimeSpan.FromSeconds(60);
+    public static readonly TimeSpan StalledStreamTimeout = TimeSpan.FromSeconds(90);
 
     public const int CircuitBreakerFailureThreshold = 5;
 

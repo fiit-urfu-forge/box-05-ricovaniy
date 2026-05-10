@@ -15,15 +15,22 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
     private readonly AgentProgressParser _progressParser;
     private readonly VaultPostOpCleanup _postOpCleanup;
     private readonly string? _resolvedCliPath;
+    private readonly TimeSpan _timeout;
+    private readonly TimeSpan _stalledTimeout;
     private ClaudeSdkClient? _chatClient;
 
-    public SdkClaudeAgent(DomainVault vault)
+    public SdkClaudeAgent(
+        DomainVault vault,
+        TimeSpan? timeout = null,
+        TimeSpan? stalledTimeout = null)
     {
         _vault = vault;
         _guard = new ClaudeToolGuard(vault.Path);
         _progressParser = new AgentProgressParser(vault.Path);
         _postOpCleanup = new VaultPostOpCleanup(vault);
         _resolvedCliPath = ClaudeCliResolver.Resolve();
+        _timeout = timeout ?? AgentLimits.ClaudeTimeout;
+        _stalledTimeout = stalledTimeout ?? AgentLimits.StalledStreamTimeout;
     }
 
     public async Task<IngestResult> IngestAsync(
@@ -35,7 +42,7 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
         var rollback = new IngestRollback(_vault.Path);
         var (created, updated) = (0, 0);
 
-        using var timeoutCts = new CancellationTokenSource(AgentLimits.ClaudeTimeout);
+        using var timeoutCts = new CancellationTokenSource(_timeout);
         using var stalledCts = new CancellationTokenSource();
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, timeoutCts.Token, stalledCts.Token);
@@ -45,9 +52,9 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
         var lastChunkAt = DateTime.UtcNow;
         using var stalledTimer = new Timer(_ =>
         {
-            if (DateTime.UtcNow - lastChunkAt > AgentLimits.StalledStreamTimeout)
+            if (DateTime.UtcNow - lastChunkAt > _stalledTimeout)
                 stalledCts.Cancel();
-        }, null, AgentLimits.StalledStreamTimeout, AgentLimits.StalledStreamTimeout);
+        }, null, _stalledTimeout, _stalledTimeout);
 
         try
         {
@@ -60,14 +67,8 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
                 if (message is AssistantMessage assistant)
                     ProcessAssistantBlocks(assistant, progress, rollback, ref created, ref updated);
 
-                if (message is RateLimitEvent rl)
-                {
-                    var msg = rl.RetryAfterSeconds is int s
-                        ? $"Rate-limit от Claude: повтор через {s}s ({rl.Subtype ?? "warning"})"
-                        : $"Rate-limit от Claude ({rl.Subtype ?? "warning"})";
-                    progress?.Report(new IngestProgressEvent(
-                        IngestProgressKind.Text, null, null, msg));
-                }
+                // RateLimitEvent / UnknownMessage / SystemMessage — silently skip.
+                // (rate-limit info is logged at the SDK level only, not shown in UI)
 
                 if (message is ResultMessage { IsError: true } error)
                 {
@@ -84,7 +85,7 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
             await rollback.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
             _postOpCleanup.Run();
             return new IngestResult(rawFileRelativePath, false, 0, 0,
-                "Claude перестал отвечать (>60s без токенов)",
+                $"Claude перестал отвечать (>{_stalledTimeout.TotalSeconds:0}s без токенов)",
                 DateTime.UtcNow - startedAt);
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
@@ -92,7 +93,7 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
             await rollback.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
             _postOpCleanup.Run();
             return new IngestResult(rawFileRelativePath, false, 0, 0,
-                "Operation timed out (>5 minutes)",
+                $"Operation timed out (>{_timeout.TotalMinutes:0} min)",
                 DateTime.UtcNow - startedAt);
         }
         catch
@@ -167,19 +168,12 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
         await foreach (var message in
             _chatClient.ReceiveResponseAsync(cancellationToken).ConfigureAwait(false))
         {
-            switch (message)
+            if (message is AssistantMessage assistant)
             {
-                case AssistantMessage assistant:
-                    foreach (var block in assistant.Content)
-                        if (block is TextBlock t) yield return t.Text;
-                    break;
-
-                case RateLimitEvent rl:
-                    yield return rl.RetryAfterSeconds is int s
-                        ? $"\n_(rate-limit Claude: повтор через {s}s)_\n"
-                        : $"\n_(rate-limit Claude: {rl.Subtype ?? "warning"})_\n";
-                    break;
+                foreach (var block in assistant.Content)
+                    if (block is TextBlock t) yield return t.Text;
             }
+            // RateLimitEvent / UnknownMessage / SystemMessage — silently skip.
         }
     }
 

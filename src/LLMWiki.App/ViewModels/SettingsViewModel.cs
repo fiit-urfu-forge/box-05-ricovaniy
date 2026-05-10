@@ -30,6 +30,12 @@ public partial class SettingsViewModel : ViewModelBase
     private bool _wikiOnlyMode;
 
     [ObservableProperty]
+    private int _claudeTimeoutMinutes;
+
+    [ObservableProperty]
+    private int _stalledStreamSeconds;
+
+    [ObservableProperty]
     private string? _validationMessage;
 
     public SettingsViewModel(ISettingsService settings, IPatStorage patStorage)
@@ -47,6 +53,8 @@ public partial class SettingsViewModel : ViewModelBase
         GitAutoSync = s.GitAutoSync;
         GitAutoSyncIntervalMinutes = s.GitAutoSyncIntervalMinutes;
         WikiOnlyMode = s.WikiOnlyMode;
+        ClaudeTimeoutMinutes = s.ClaudeTimeoutMinutes;
+        StalledStreamSeconds = s.StalledStreamSeconds;
     }
 
     [RelayCommand]
@@ -67,6 +75,8 @@ public partial class SettingsViewModel : ViewModelBase
         s.GitAutoSync = GitAutoSync;
         s.GitAutoSyncIntervalMinutes = GitAutoSyncIntervalMinutes;
         s.WikiOnlyMode = WikiOnlyMode;
+        s.ClaudeTimeoutMinutes = ClaudeTimeoutMinutes;
+        s.StalledStreamSeconds = StalledStreamSeconds;
         await _settings.SaveAsync(s);
 
         if (!string.IsNullOrEmpty(GithubPat) && !string.IsNullOrEmpty(VaultPath))

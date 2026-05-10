@@ -74,5 +74,9 @@ public sealed class SettingsService : ISettingsService
     {
         if (settings.GitAutoSyncIntervalMinutes <= 0)
             settings.GitAutoSyncIntervalMinutes = 15;
+        if (settings.ClaudeTimeoutMinutes <= 0)
+            settings.ClaudeTimeoutMinutes = 15;
+        if (settings.StalledStreamSeconds <= 0)
+            settings.StalledStreamSeconds = 90;
     }
 }

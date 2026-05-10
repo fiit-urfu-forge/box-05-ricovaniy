@@ -6,7 +6,14 @@ public enum IngestProgressKind
     Write,
     Edit,
     Text,
-    OtherTool
+    Glob,
+    Grep,
+    Search,
+    WebFetch,
+    Todo,
+    Subagent,
+    Notebook,
+    OtherTool,
 }
 
 public sealed record IngestProgressEvent(
@@ -17,11 +24,18 @@ public sealed record IngestProgressEvent(
 {
     public string Describe() => Kind switch
     {
-        IngestProgressKind.Read =>  $"Читает: {RelativePath}",
-        IngestProgressKind.Write => $"Создаёт: {RelativePath}",
-        IngestProgressKind.Edit =>  $"Обновляет: {RelativePath}",
-        IngestProgressKind.Text =>  Snippet ?? string.Empty,
-        IngestProgressKind.OtherTool => $"Инструмент: {ToolName}",
+        IngestProgressKind.Read =>     $"Читает: {RelativePath}",
+        IngestProgressKind.Write =>    $"Создаёт: {RelativePath}",
+        IngestProgressKind.Edit =>     $"Обновляет: {RelativePath}",
+        IngestProgressKind.Glob =>     $"Ищет файлы по шаблону: {Snippet}",
+        IngestProgressKind.Grep =>     $"Поиск по содержимому: {Snippet}",
+        IngestProgressKind.Search =>   $"Веб-поиск: {Snippet}",
+        IngestProgressKind.WebFetch => $"Загружает URL: {Snippet}",
+        IngestProgressKind.Todo =>     "Обновляет внутренний план",
+        IngestProgressKind.Subagent => $"Запускает sub-agent: {Snippet}",
+        IngestProgressKind.Notebook => $"Правит ноутбук: {RelativePath}",
+        IngestProgressKind.Text =>     Snippet ?? string.Empty,
+        IngestProgressKind.OtherTool =>$"Инструмент: {ToolName}",
         _ => string.Empty,
     };
 }

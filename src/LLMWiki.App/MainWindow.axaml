@@ -149,7 +149,21 @@
                         <CheckBox IsChecked="{CompiledBinding SettingsTab.WikiOnlyMode, Mode=TwoWay}"
                                   Content="WikiOnly режим чата по умолчанию" />
 
+                        <TextBlock Text="Таймауты Claude" FontWeight="Bold" Margin="0,16,0,0" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock VerticalAlignment="Center"
+                                       Text="Общий таймаут операции, мин:" />
+                            <NumericUpDown Value="{CompiledBinding SettingsTab.ClaudeTimeoutMinutes, Mode=TwoWay}"
+                                           Minimum="1" Maximum="120" Width="120" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock VerticalAlignment="Center"
+                                       Text="Stalled-stream, сек (без токенов):" />
+                            <NumericUpDown Value="{CompiledBinding SettingsTab.StalledStreamSeconds, Mode=TwoWay}"
+                                           Minimum="15" Maximum="600" Width="120" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0">
                             <Button Content="Сохранить"
                                     Command="{CompiledBinding SettingsTab.SaveCommand}" />
                             <Button Content="Setup GitHub"
