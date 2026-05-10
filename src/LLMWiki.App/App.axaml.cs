@@ -1,12 +1,15 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using LLMWiki.App.Agent;
 using LLMWiki.App.ViewModels;
 using LLMWiki.Core.Agent;
 using LLMWiki.Core.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 
 namespace LLMWiki.App;
 
@@ -21,40 +24,66 @@ public partial class App : Application
         AvaloniaXamlLoader.Load(this);
     }
 
-    public override async void OnFrameworkInitializationCompleted()
+    public override void OnFrameworkInitializationCompleted()
     {
-        Services = AppServices.Build();
-
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        try
         {
-            _instanceLock = new SingleInstanceLock();
-            if (!_instanceLock.TryAcquire())
+            Services = AppServices.Build();
+            AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+            TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                desktop.Shutdown(0);
-                return;
+                _instanceLock = new SingleInstanceLock();
+                if (!_instanceLock.TryAcquire())
+                {
+                    desktop.Shutdown(0);
+                    return;
+                }
+
+                desktop.Exit += OnExit;
+
+                var vm = Services.GetRequiredService<MainWindowViewModel>();
+                var window = new MainWindow { DataContext = vm };
+                desktop.MainWindow = window;
+
+                window.Opened += async (_, _) =>
+                {
+                    try
+                    {
+                        await PostStartupAsync(window, vm);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Error(ex, "Post-startup failed");
+                        await ShowMessageAsync(window, "Ошибка запуска",
+                            $"Не удалось завершить инициализацию: {ex.Message}");
+                    }
+                };
             }
-
-            desktop.Exit += OnExit;
-            desktop.ShutdownRequested += OnShutdownRequested;
-
-            await EnsureClaudeAvailableAsync(desktop);
-
-            var vm = Services.GetRequiredService<MainWindowViewModel>();
-            await vm.InitializeAsync();
-
-            desktop.MainWindow = new MainWindow { DataContext = vm };
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.WriteCrash(ex, "OnFrameworkInitializationCompleted");
+            try { Log.Logger.Fatal(ex, "Application failed to start"); } catch { }
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime d)
+                d.Shutdown(1);
+            return;
         }
 
         base.OnFrameworkInitializationCompleted();
     }
 
-    private async Task EnsureClaudeAvailableAsync(IClassicDesktopStyleApplicationLifetime desktop)
+    private static async Task PostStartupAsync(MainWindow window, MainWindowViewModel vm)
     {
-        if (!await ClaudeCliChecker.IsInstalledAsync())
+        await vm.InitializeAsync();
+
+        var hasClaude = await ClaudeCliChecker.IsInstalledAsync();
+        if (!hasClaude)
         {
-            await ShowMessageAsync(desktop,
-                "Claude Code не установлен",
-                "Требуется CLI `claude` в PATH. Установите Claude Code и перезапустите приложение.");
+            await ShowMessageAsync(window, "Claude Code не установлен",
+                "В PATH не найден `claude`. Установите Claude Code и перезапустите приложение.\n" +
+                "https://claude.com/claude-code");
             return;
         }
 
@@ -62,46 +91,69 @@ public partial class App : Application
         if (auth.Status != ClaudeAuthStatus.Authorized)
         {
             var loginVm = Services.GetRequiredService<ClaudeLoginViewModel>();
-            var window = new Views.ClaudeLoginWindow { DataContext = loginVm };
-            await window.ShowDialog(GetAnyOpenWindow(desktop) ?? new Window
-            {
-                Width = 1, Height = 1, ShowInTaskbar = false, IsVisible = false,
-            });
+            var login = new Views.ClaudeLoginWindow { DataContext = loginVm };
+            await login.ShowDialog(window);
         }
     }
 
-    private static Window? GetAnyOpenWindow(IClassicDesktopStyleApplicationLifetime desktop) =>
-        desktop.MainWindow;
-
-    private static async Task ShowMessageAsync(
-        IClassicDesktopStyleApplicationLifetime desktop, string title, string message)
+    private static Task ShowMessageAsync(Window owner, string title, string message)
     {
-        var window = new Window
+        var tcs = new TaskCompletionSource();
+        var ok = new Button
+        {
+            Content = "OK",
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        var dialog = new Window
         {
             Title = title,
             Width = 480,
-            Height = 200,
+            Height = 220,
             CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Content = new StackPanel
             {
                 Margin = new Thickness(16),
                 Spacing = 12,
                 Children =
                 {
-                    new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
-                    new Button { Content = "OK", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right },
+                    new TextBlock
+                    {
+                        Text = message,
+                        TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    },
+                    ok,
                 },
             },
         };
-        if (desktop.MainWindow is null)
-            window.Show();
-        else
-            await window.ShowDialog(desktop.MainWindow);
+        ok.Click += (_, _) => dialog.Close();
+        dialog.Closed += (_, _) => tcs.TrySetResult();
+
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try { await dialog.ShowDialog(owner); }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to show message dialog");
+                tcs.TrySetException(ex);
+            }
+        });
+        return tcs.Task;
     }
 
-    private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
+    private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
-        // allow normal shutdown to proceed; cleanup happens in OnExit
+        var ex = e.ExceptionObject as Exception;
+        if (ex is not null) CrashLogger.WriteCrash(ex, "Unhandled domain exception");
+        try { Log.Logger.Fatal(ex, "Unhandled domain exception"); } catch { }
+    }
+
+    private static void OnUnobservedTaskException(
+        object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        CrashLogger.WriteCrash(e.Exception, "Unobserved task exception");
+        try { Log.Logger.Error(e.Exception, "Unobserved task exception"); } catch { }
+        e.SetObserved();
     }
 
     private void OnExit(object? sender, ControlledApplicationLifetimeExitEventArgs e)
@@ -111,18 +163,25 @@ public partial class App : Application
             if (Services is ServiceProvider sp)
             {
                 var ingest = sp.GetService<Services.IngestService>();
-                if (ingest is not null) ingest.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(5));
+                if (ingest is not null)
+                    ingest.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(5));
 
                 var git = sp.GetService<Services.GitSyncCoordinator>();
-                if (git is not null) git.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(5));
+                if (git is not null)
+                    git.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(5));
 
                 sp.Dispose();
             }
+        }
+        catch (Exception ex)
+        {
+            try { Log.Logger.Error(ex, "Cleanup on exit failed"); } catch { }
         }
         finally
         {
             _instanceLock?.Dispose();
             _instanceLock = null;
+            try { Log.CloseAndFlush(); } catch { }
         }
     }
 }
