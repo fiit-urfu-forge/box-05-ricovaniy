@@ -26,7 +26,10 @@ public partial class ChatViewModel : ViewModelBase
     private bool _isSending;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WikiOnly))]
     private bool _wikiPlusAi;
+
+    public bool WikiOnly => !WikiPlusAi;
 
     [ObservableProperty]
     private string? _statusMessage;

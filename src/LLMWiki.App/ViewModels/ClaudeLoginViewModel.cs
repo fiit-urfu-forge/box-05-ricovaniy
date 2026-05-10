@@ -22,7 +22,10 @@ public partial class ClaudeLoginViewModel : ViewModelBase, IAsyncDisposable
     private string _input = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNotRunning))]
     private bool _isRunning;
+
+    public bool IsNotRunning => !IsRunning;
 
     [ObservableProperty]
     private bool _isAuthorized;

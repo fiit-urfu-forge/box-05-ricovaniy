@@ -3,41 +3,45 @@
         xmlns:vm="using:LLMWiki.App.ViewModels"
         x:Class="LLMWiki.App.Views.ConflictResolutionWindow"
         x:DataType="vm:ConflictResolutionViewModel"
+        x:CompileBindings="True"
         Title="Разрешение конфликтов"
         Width="1100" Height="720">
 
     <Grid RowDefinitions="*,Auto" Margin="12">
-        <ItemsControl Grid.Row="0" ItemsSource="{Binding Items}">
+        <ItemsControl Grid.Row="0" ItemsSource="{CompiledBinding Items}">
             <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="vm:ConflictResolutionItem">
-                    <Border BorderBrush="LightGray" BorderThickness="1" Padding="8" Margin="0,0,0,12" CornerRadius="4">
+                    <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            BorderThickness="1" Padding="8" Margin="0,0,0,12" CornerRadius="4">
                         <StackPanel>
-                            <TextBlock Text="{Binding RelativePath}" FontWeight="Bold" />
+                            <TextBlock Text="{CompiledBinding RelativePath}" FontWeight="Bold" />
                             <Grid ColumnDefinitions="*,*" Margin="0,8" RowDefinitions="Auto,*">
                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Моя версия" FontStyle="Italic" />
                                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Версия из GitHub" FontStyle="Italic" />
                                 <Border Grid.Row="1" Grid.Column="0" Margin="0,4,4,0"
-                                        BorderBrush="LightGray" BorderThickness="1">
+                                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                        BorderThickness="1">
                                     <ScrollViewer>
-                                        <SelectableTextBlock Text="{Binding Entry.LocalContent}"
+                                        <SelectableTextBlock Text="{CompiledBinding Entry.LocalContent}"
                                                              FontFamily="Cascadia Mono, Consolas, monospace" />
                                     </ScrollViewer>
                                 </Border>
                                 <Border Grid.Row="1" Grid.Column="1" Margin="4,4,0,0"
-                                        BorderBrush="LightGray" BorderThickness="1">
+                                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                        BorderThickness="1">
                                     <ScrollViewer>
-                                        <SelectableTextBlock Text="{Binding Entry.RemoteContent}"
+                                        <SelectableTextBlock Text="{CompiledBinding Entry.RemoteContent}"
                                                              FontFamily="Cascadia Mono, Consolas, monospace" />
                                     </ScrollViewer>
                                 </Border>
                             </Grid>
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <RadioButton GroupName="{Binding RelativePath}"
+                                <RadioButton GroupName="{CompiledBinding RelativePath}"
                                              Content="Оставить мою"
-                                             IsChecked="{Binding Choice, Converter={x:Static vm:ConflictChoiceToBoolConverter.KeepLocal}}" />
-                                <RadioButton GroupName="{Binding RelativePath}"
+                                             IsChecked="{CompiledBinding Choice, Mode=TwoWay, Converter={x:Static vm:ConflictChoiceToBoolConverter.KeepLocal}}" />
+                                <RadioButton GroupName="{CompiledBinding RelativePath}"
                                              Content="Взять из GitHub"
-                                             IsChecked="{Binding Choice, Converter={x:Static vm:ConflictChoiceToBoolConverter.TakeRemote}}" />
+                                             IsChecked="{CompiledBinding Choice, Mode=TwoWay, Converter={x:Static vm:ConflictChoiceToBoolConverter.TakeRemote}}" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -48,6 +52,6 @@
         <Button Grid.Row="1"
                 HorizontalAlignment="Right"
                 Content="Применить все решения"
-                IsEnabled="{Binding AllResolved}" />
+                IsEnabled="{CompiledBinding AllResolved}" />
     </Grid>
 </Window>

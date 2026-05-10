@@ -5,6 +5,7 @@
         xmlns:domain="using:LLMWiki.Core.Domain"
         x:Class="LLMWiki.App.MainWindow"
         x:DataType="vm:MainWindowViewModel"
+        x:CompileBindings="True"
         DragDrop.AllowDrop="True"
         Title="LLM Wiki"
         Width="1280" Height="800">
@@ -13,27 +14,27 @@
         <DockPanel Grid.Row="0" Background="#1F2937" LastChildFill="True">
             <Button Content="Открыть vault…" Margin="8" Click="OnOpenVaultClick" />
             <Button Content="Добавить файл…" Margin="0,8,4,8" Click="OnAddFileClick"
-                    IsEnabled="{Binding IsVaultOpen}" />
+                    IsEnabled="{CompiledBinding IsVaultOpen}" />
             <Button Content="Переиндексировать" Margin="0,8,4,8" Click="OnReindexClick"
-                    IsEnabled="{Binding IsVaultOpen}" />
+                    IsEnabled="{CompiledBinding IsVaultOpen}" />
             <Button Content="claude login" Margin="0,8,4,8" Click="OnClaudeLoginClick" />
             <Button Content="Push" Margin="0,8,4,8" Click="OnGitPushClick"
-                    IsEnabled="{Binding IsVaultOpen}" />
+                    IsEnabled="{CompiledBinding IsVaultOpen}" />
             <Button Content="Pull" Margin="0,8,4,8" Click="OnGitPullClick"
-                    IsEnabled="{Binding IsVaultOpen}" />
+                    IsEnabled="{CompiledBinding IsVaultOpen}" />
             <Button Content="Lint" Margin="0,8,4,8" Click="OnLintClick"
-                    IsEnabled="{Binding IsVaultOpen}" />
+                    IsEnabled="{CompiledBinding IsVaultOpen}" />
             <TextBlock VerticalAlignment="Center"
                        Foreground="White"
                        Margin="8,0"
-                       Text="{Binding VaultPath, FallbackValue='Vault не выбран'}" />
+                       Text="{CompiledBinding VaultPath, FallbackValue='Vault не выбран'}" />
         </DockPanel>
 
-        <TabControl Grid.Row="1" IsEnabled="{Binding IsVaultOpen}">
+        <TabControl Grid.Row="1" IsEnabled="{CompiledBinding IsVaultOpen}">
             <TabItem Header="Файлы">
                 <Grid ColumnDefinitions="320,*" RowDefinitions="*">
                     <TreeView Grid.Column="0"
-                              ItemsSource="{Binding Files.Roots}"
+                              ItemsSource="{CompiledBinding Files.Roots}"
                               SelectionChanged="OnFileSelectionChanged">
                         <TreeView.ItemTemplate>
                             <TreeDataTemplate ItemsSource="{Binding Children}"
@@ -43,8 +44,9 @@
                         </TreeView.ItemTemplate>
                     </TreeView>
                     <Border Grid.Column="1" Margin="8" Padding="8"
-                            BorderBrush="LightGray" BorderThickness="1">
-                        <ContentControl Content="{Binding Files.Viewer}" />
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            BorderThickness="1">
+                        <ContentControl Content="{CompiledBinding Files.Viewer}" />
                     </Border>
                 </Grid>
             </TabItem>
@@ -53,41 +55,39 @@
                 <Grid RowDefinitions="Auto,*,Auto">
                     <DockPanel Grid.Row="0" Margin="8">
                         <Button Content="Обновить граф"
-                                Command="{Binding Graph.RefreshCommand}" />
+                                Command="{CompiledBinding Graph.RefreshCommand}" />
                         <TextBlock VerticalAlignment="Center" Margin="8,0">
                             <Run Text="Нод: " />
-                            <Run Text="{Binding Graph.NodeCount}" />
+                            <Run Text="{CompiledBinding Graph.NodeCount}" />
                             <Run Text="  Связей: " />
-                            <Run Text="{Binding Graph.EdgeCount}" />
+                            <Run Text="{CompiledBinding Graph.EdgeCount}" />
                         </TextBlock>
                     </DockPanel>
 
                     <views:GraphCanvas Grid.Row="1"
                                        Margin="8"
-                                       Nodes="{Binding Graph.Nodes}"
-                                       Edges="{Binding Graph.Edges}"
+                                       Nodes="{CompiledBinding Graph.Nodes}"
+                                       Edges="{CompiledBinding Graph.Edges}"
                                        NodeActivated="OnGraphNodeActivated" />
 
                     <TextBlock Grid.Row="2" Margin="8"
-                               Text="{Binding Graph.StatusMessage}"
-                               Foreground="#6B7280" />
+                               Text="{CompiledBinding Graph.StatusMessage}"
+                               Opacity="0.7" />
                 </Grid>
             </TabItem>
 
             <TabItem Header="Чат">
                 <Grid RowDefinitions="*,Auto,Auto" Margin="8">
                     <ScrollViewer Grid.Row="0" Name="ChatScroll">
-                        <ItemsControl ItemsSource="{Binding Chat.Messages}">
+                        <ItemsControl ItemsSource="{CompiledBinding Chat.Messages}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="domain:ChatMessage">
                                     <Border Padding="8" Margin="0,4"
                                             CornerRadius="6"
-                                            Background="#F3F4F6">
+                                            Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
                                         <StackPanel>
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock Text="{Binding Role}"
-                                                           FontWeight="Bold" />
-                                            </StackPanel>
+                                            <TextBlock Text="{Binding Role}"
+                                                       FontWeight="Bold" />
                                             <SelectableTextBlock Text="{Binding Content}"
                                                                  TextWrapping="Wrap" />
                                         </StackPanel>
@@ -99,25 +99,25 @@
 
                     <DockPanel Grid.Row="1" Margin="0,4">
                         <CheckBox DockPanel.Dock="Left"
-                                  IsChecked="{Binding Chat.WikiPlusAi}"
+                                  IsChecked="{CompiledBinding Chat.WikiPlusAi, Mode=TwoWay}"
                                   Content="Wiki + AI (использовать общие знания)" />
                         <TextBlock VerticalAlignment="Center"
                                    HorizontalAlignment="Right"
-                                   Foreground="#0369A1"
+                                   Foreground="{DynamicResource SystemAccentColorBrush}"
                                    FontWeight="Bold"
-                                   IsVisible="{Binding !Chat.WikiPlusAi}"
+                                   IsVisible="{CompiledBinding Chat.WikiOnly}"
                                    Text="из wiki" />
                     </DockPanel>
 
                     <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,4">
                         <TextBox Grid.Column="0"
-                                 Text="{Binding Chat.Input, Mode=TwoWay}"
+                                 Text="{CompiledBinding Chat.Input, Mode=TwoWay}"
                                  PlaceholderText="Задайте вопрос…"
                                  AcceptsReturn="False" />
                         <Button Grid.Column="1"
                                 Margin="8,0,0,0"
                                 Content="Отправить"
-                                Command="{Binding Chat.SendCommand}" />
+                                Command="{CompiledBinding Chat.SendCommand}" />
                     </Grid>
                 </Grid>
             </TabItem>
@@ -126,51 +126,55 @@
                 <ScrollViewer>
                     <StackPanel Margin="16" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
                         <TextBlock Text="Vault" FontWeight="Bold" />
-                        <TextBlock Text="{Binding SettingsTab.VaultPath, FallbackValue='Не выбран'}" />
+                        <TextBlock Text="{CompiledBinding SettingsTab.VaultPath, FallbackValue='Не выбран'}" />
 
                         <TextBlock Text="GitHub remote URL" FontWeight="Bold" Margin="0,16,0,0" />
-                        <TextBox Text="{Binding SettingsTab.GitRemoteUrl, Mode=TwoWay}"
+                        <TextBox Text="{CompiledBinding SettingsTab.GitRemoteUrl, Mode=TwoWay}"
                                  PlaceholderText="https://github.com/user/repo.git" />
 
                         <TextBlock Text="Personal Access Token" FontWeight="Bold" />
-                        <TextBox Text="{Binding SettingsTab.GithubPat, Mode=TwoWay}"
+                        <TextBox Text="{CompiledBinding SettingsTab.GithubPat, Mode=TwoWay}"
                                  PasswordChar="•" />
 
-                        <CheckBox IsChecked="{Binding SettingsTab.GitAutoSync}"
+                        <CheckBox IsChecked="{CompiledBinding SettingsTab.GitAutoSync, Mode=TwoWay}"
                                   Content="Автосинхронизация" />
 
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock VerticalAlignment="Center"
                                        Text="Интервал, мин:" />
-                            <NumericUpDown Value="{Binding SettingsTab.GitAutoSyncIntervalMinutes, Mode=TwoWay}"
+                            <NumericUpDown Value="{CompiledBinding SettingsTab.GitAutoSyncIntervalMinutes, Mode=TwoWay}"
                                            Minimum="1" Maximum="1440" Width="120" />
                         </StackPanel>
 
-                        <CheckBox IsChecked="{Binding SettingsTab.WikiOnlyMode}"
+                        <CheckBox IsChecked="{CompiledBinding SettingsTab.WikiOnlyMode, Mode=TwoWay}"
                                   Content="WikiOnly режим чата по умолчанию" />
 
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Content="Сохранить"
-                                    Command="{Binding SettingsTab.SaveCommand}" />
+                                    Command="{CompiledBinding SettingsTab.SaveCommand}" />
                             <Button Content="Setup GitHub"
                                     Click="OnGitSetupClick" />
                             <Button Content="Отключить GitHub"
                                     Click="OnGitDisableClick" />
                         </StackPanel>
-                        <TextBlock Text="{Binding SettingsTab.ValidationMessage}"
-                                   Foreground="#6B7280" />
+                        <TextBlock Text="{CompiledBinding SettingsTab.ValidationMessage}"
+                                   Opacity="0.7" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
         </TabControl>
 
-        <Border Grid.Row="2" Background="#F3F4F6" Padding="8">
+        <Border Grid.Row="2"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="8">
             <DockPanel LastChildFill="True">
                 <TextBlock DockPanel.Dock="Right"
-                           Foreground="#6B7280"
-                           Text="{Binding ActivityMessage}"
+                           Opacity="0.7"
+                           Text="{CompiledBinding ActivityMessage}"
                            Margin="8,0" />
-                <TextBlock Text="{Binding StatusMessage}" />
+                <TextBlock Text="{CompiledBinding StatusMessage}" />
             </DockPanel>
         </Border>
     </Grid>
