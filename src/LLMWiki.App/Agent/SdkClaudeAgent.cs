@@ -60,6 +60,15 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
                 if (message is AssistantMessage assistant)
                     ProcessAssistantBlocks(assistant, progress, rollback, ref created, ref updated);
 
+                if (message is RateLimitEvent rl)
+                {
+                    var msg = rl.RetryAfterSeconds is int s
+                        ? $"Rate-limit от Claude: повтор через {s}s ({rl.Subtype ?? "warning"})"
+                        : $"Rate-limit от Claude ({rl.Subtype ?? "warning"})";
+                    progress?.Report(new IngestProgressEvent(
+                        IngestProgressKind.Text, null, null, msg));
+                }
+
                 if (message is ResultMessage { IsError: true } error)
                 {
                     await rollback.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
@@ -158,12 +167,18 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
         await foreach (var message in
             _chatClient.ReceiveResponseAsync(cancellationToken).ConfigureAwait(false))
         {
-            if (message is AssistantMessage assistant)
+            switch (message)
             {
-                foreach (var block in assistant.Content)
-                {
-                    if (block is TextBlock t) yield return t.Text;
-                }
+                case AssistantMessage assistant:
+                    foreach (var block in assistant.Content)
+                        if (block is TextBlock t) yield return t.Text;
+                    break;
+
+                case RateLimitEvent rl:
+                    yield return rl.RetryAfterSeconds is int s
+                        ? $"\n_(rate-limit Claude: повтор через {s}s)_\n"
+                        : $"\n_(rate-limit Claude: {rl.Subtype ?? "warning"})_\n";
+                    break;
             }
         }
     }

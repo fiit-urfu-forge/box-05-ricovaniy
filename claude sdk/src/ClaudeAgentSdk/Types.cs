@@ -294,6 +294,30 @@ public class ControlRequest : Message
 }
 
 /// <summary>
+/// Rate limit notification from Claude Code (warning or exceeded).
+/// Newer Claude Code CLI versions emit this to inform clients about
+/// rate-limit windows.
+/// </summary>
+public class RateLimitEvent : Message
+{
+    public string? Subtype { get; set; }
+    public int? RetryAfterSeconds { get; set; }
+    public string? Message { get; set; }
+    public Dictionary<string, object>? Raw { get; set; }
+}
+
+/// <summary>
+/// Fallback for any message type the SDK does not recognise.
+/// Keeps the SDK forward-compatible with newer Claude Code CLI releases
+/// instead of throwing.
+/// </summary>
+public class UnknownMessage : Message
+{
+    public required string Type { get; set; }
+    public Dictionary<string, object>? Raw { get; set; }
+}
+
+/// <summary>
 /// Query options for Claude SDK.
 /// </summary>
 public class ClaudeAgentOptions

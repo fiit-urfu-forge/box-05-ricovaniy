@@ -22,8 +22,33 @@ public static class MessageParser
             "result" => ParseResultMessage(data),
             "stream" or "stream_event" => ParseStreamEvent(data),
             "control_request" => ParseControlRequest(data),
-            _ => throw new ArgumentException($"Unknown message type: {type}")
+            "rate_limit_event" => ParseRateLimitEvent(data),
+            _ => new UnknownMessage
+            {
+                Type = type ?? "(missing)",
+                Raw = data,
+            },
         };
+    }
+
+    private static RateLimitEvent ParseRateLimitEvent(Dictionary<string, object> data)
+    {
+        return new RateLimitEvent
+        {
+            Subtype = GetStringOrNull(data, "subtype"),
+            RetryAfterSeconds = GetIntOrNull(data, "retry_after_seconds")
+                ?? GetIntOrNull(data, "retry_after"),
+            Message = GetStringOrNull(data, "message"),
+            Raw = data,
+        };
+    }
+
+    private static int? GetIntOrNull(Dictionary<string, object> data, string key)
+    {
+        if (!data.TryGetValue(key, out var value) || value is not JsonElement element)
+            return null;
+        if (element.ValueKind == JsonValueKind.Null) return null;
+        return element.ValueKind == JsonValueKind.Number ? element.GetInt32() : null;
     }
 
     private static UserMessage ParseUserMessage(Dictionary<string, object> data)
