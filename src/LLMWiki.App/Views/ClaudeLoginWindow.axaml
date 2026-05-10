@@ -1,0 +1,48 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LLMWiki.App.ViewModels"
+        x:Class="LLMWiki.App.Views.ClaudeLoginWindow"
+        x:DataType="vm:ClaudeLoginViewModel"
+        Title="Claude — авторизация"
+        Width="900" Height="640">
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto" Margin="12">
+        <StackPanel Grid.Row="0" Spacing="6">
+            <TextBlock Text="Авторизация Claude Code" FontSize="20" FontWeight="Bold" />
+            <TextBlock Text="Запустите `claude login`. Окно показывает вывод PTY и принимает ввод." TextWrapping="Wrap" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Margin="0,12" BorderBrush="#374151" BorderThickness="1"
+                Background="#0F172A" CornerRadius="4">
+            <ScrollViewer Padding="8">
+                <SelectableTextBlock Text="{Binding Output}"
+                                     Foreground="#E5E7EB"
+                                     FontFamily="Cascadia Mono, Consolas, monospace" />
+            </ScrollViewer>
+        </Border>
+
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,4">
+            <TextBox Grid.Column="0"
+                     Text="{Binding Input, Mode=TwoWay}"
+                     PlaceholderText="ввод (Enter)" />
+            <Button Grid.Column="1"
+                    Margin="8,0,0,0"
+                    Content="Отправить"
+                    Command="{Binding SendInputCommand}" />
+        </Grid>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+            <Button Content="Запустить claude login"
+                    Command="{Binding StartCommand}"
+                    IsEnabled="{Binding !IsRunning}" />
+            <Button Content="Отменить"
+                    Command="{Binding CancelCommand}"
+                    IsEnabled="{Binding IsRunning}" />
+            <Button Content="Проверить credentials"
+                    Command="{Binding RecheckCommand}" />
+            <TextBlock VerticalAlignment="Center"
+                       Foreground="#6B7280"
+                       Text="{Binding StatusMessage}" />
+        </StackPanel>
+    </Grid>
+</Window>
