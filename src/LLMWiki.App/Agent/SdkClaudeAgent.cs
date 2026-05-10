@@ -1,4 +1,5 @@
 using ClaudeAgentSdk;
+using ClaudeAgentSdk.Transport;
 using LLMWiki.Core.Agent;
 using LLMWiki.Core.Domain;
 using LLMWiki.Core.Ingest;
@@ -13,6 +14,7 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
     private readonly ClaudeToolGuard _guard;
     private readonly AgentProgressParser _progressParser;
     private readonly VaultPostOpCleanup _postOpCleanup;
+    private readonly string? _resolvedCliPath;
     private ClaudeSdkClient? _chatClient;
 
     public SdkClaudeAgent(DomainVault vault)
@@ -21,6 +23,7 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
         _guard = new ClaudeToolGuard(vault.Path);
         _progressParser = new AgentProgressParser(vault.Path);
         _postOpCleanup = new VaultPostOpCleanup(vault);
+        _resolvedCliPath = ClaudeCliResolver.Resolve();
     }
 
     public async Task<IngestResult> IngestAsync(
@@ -48,8 +51,9 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
 
         try
         {
+            var transport = BuildTransport(prompt, options);
             await foreach (var message in
-                ClaudeAgent.QueryAsync(prompt, options, cancellationToken: linked.Token))
+                ClaudeAgent.QueryAsync(prompt, options, transport, cancellationToken: linked.Token))
             {
                 lastChunkAt = DateTime.UtcNow;
 
@@ -102,8 +106,10 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
         var options = BuildOptions(SystemPrompts.LintPrompt, AgentLimits.LintMaxTurns);
         var summary = new System.Text.StringBuilder();
 
+        var lintPrompt = "Run lint on the wiki.";
+        var lintTransport = BuildTransport(lintPrompt, options);
         await foreach (var message in
-            ClaudeAgent.QueryAsync("Run lint on the wiki.", options,
+            ClaudeAgent.QueryAsync(lintPrompt, options, lintTransport,
                 cancellationToken: cancellationToken))
         {
             if (message is AssistantMessage assistant)
@@ -139,7 +145,9 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
         if (_chatClient is null)
         {
             var options = BuildOptions(SystemPrompts.ForChatMode(mode), AgentLimits.QueryMaxTurns);
-            _chatClient = new ClaudeSdkClient(options);
+            // Streaming/multi-turn uses an empty-array prompt as initial.
+            var transport = BuildTransport(Array.Empty<object>(), options);
+            _chatClient = new ClaudeSdkClient(options, transport);
             await _chatClient.ConnectAsync(cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -203,6 +211,9 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
             }
         }
     }
+
+    private SubprocessCliTransport BuildTransport(object prompt, ClaudeAgentOptions options) =>
+        new(prompt, options, _resolvedCliPath);
 
     private ClaudeAgentOptions BuildOptions(string systemPrompt, int maxTurns)
     {

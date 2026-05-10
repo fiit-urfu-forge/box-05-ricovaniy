@@ -50,36 +50,48 @@ public class SubprocessCliTransport : ITransport
 
     private static string FindCli()
     {
-        // Check PATH
-        var cliName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "claude.cmd" : "claude";
-        var pathVar = Environment.GetEnvironmentVariable("PATH");
+        var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+        var candidateNames = isWindows
+            ? new[] { "claude.cmd", "claude.exe", "claude.bat", "claude" }
+            : new[] { "claude" };
 
+        var pathVar = Environment.GetEnvironmentVariable("PATH");
         if (pathVar != null)
         {
-            var paths = pathVar.Split(Path.PathSeparator);
-            foreach (var path in paths)
+            foreach (var path in pathVar.Split(Path.PathSeparator))
             {
-                var fullPath = Path.Combine(path, cliName);
-                if (File.Exists(fullPath))
-                    return fullPath;
+                if (string.IsNullOrWhiteSpace(path)) continue;
+                foreach (var cliName in candidateNames)
+                {
+                    var fullPath = Path.Combine(path, cliName);
+                    if (File.Exists(fullPath))
+                        return fullPath;
+                }
             }
         }
 
         // Check common locations
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var locations = new[]
+        var dirs = new[]
         {
-            Path.Combine(home, ".npm-global", "bin", cliName),
-            Path.Combine("/usr", "local", "bin", cliName),
-            Path.Combine(home, ".local", "bin", cliName),
-            Path.Combine(home, "node_modules", ".bin", cliName),
-            Path.Combine(home, ".yarn", "bin", cliName)
+            Path.Combine(home, ".npm-global", "bin"),
+            Path.Combine(home, "AppData", "Roaming", "npm"),
+            Path.Combine(home, "AppData", "Local", "AnthropicClaude"),
+            Path.Combine(home, ".local", "bin"),
+            Path.Combine(home, "node_modules", ".bin"),
+            Path.Combine(home, ".yarn", "bin"),
+            "/usr/local/bin",
+            "/opt/homebrew/bin",
         };
 
-        foreach (var location in locations)
+        foreach (var dir in dirs)
         {
-            if (File.Exists(location))
-                return location;
+            foreach (var cliName in candidateNames)
+            {
+                var fullPath = Path.Combine(dir, cliName);
+                if (File.Exists(fullPath))
+                    return fullPath;
+            }
         }
 
         throw new CliNotFoundException(
