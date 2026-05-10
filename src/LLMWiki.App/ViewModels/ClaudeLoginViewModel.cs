@@ -54,8 +54,12 @@ public partial class ClaudeLoginViewModel : ViewModelBase, IAsyncDisposable
 
         try
         {
+            var resolved = Agent.ClaudeCliResolver.Resolve()
+                ?? throw new InvalidOperationException(
+                    "`claude` не найден ни в PATH, ни в стандартных npm-локациях");
+
             await _terminal.StartAsync(
-                "claude",
+                resolved,
                 new[] { "login" },
                 workingDirectory: Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         }

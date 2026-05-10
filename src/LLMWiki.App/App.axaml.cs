@@ -81,9 +81,16 @@ public partial class App : Application
         var hasClaude = await ClaudeCliChecker.IsInstalledAsync();
         if (!hasClaude)
         {
-            await ShowMessageAsync(window, "Claude Code не установлен",
-                "В PATH не найден `claude`. Установите Claude Code и перезапустите приложение.\n" +
-                "https://claude.com/claude-code");
+            var pathVar = Environment.GetEnvironmentVariable("PATH") ?? "(empty)";
+            var expectedName = ClaudeCliResolver.ExecutableName;
+            await ShowMessageAsync(window, "Claude Code не найден",
+                $"Искали `{expectedName}` в PATH и в стандартных npm-локациях, не нашли.\n\n" +
+                "Установите Claude Code и убедитесь, что он в PATH:\n" +
+                "  npm install -g @anthropic-ai/claude-code\n\n" +
+                "На Windows глобальный npm bin обычно " +
+                @"%APPDATA%\npm — добавьте его в PATH, " +
+                "если ещё не добавлен.\n\n" +
+                $"Текущий PATH:\n{pathVar}");
             return;
         }
 

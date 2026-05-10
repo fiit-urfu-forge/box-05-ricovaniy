@@ -13,9 +13,13 @@ public sealed class ClaudeLoginRunner : IAsyncDisposable
         if (IsRunning)
             throw new InvalidOperationException("`claude login` is already running");
 
+        var fileName = ClaudeCliResolver.Resolve()
+            ?? throw new InvalidOperationException(
+                "`claude` CLI not found in PATH or common npm locations");
+
         var psi = new ProcessStartInfo
         {
-            FileName = "claude",
+            FileName = fileName,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
