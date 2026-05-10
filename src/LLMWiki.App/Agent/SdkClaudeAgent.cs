@@ -56,6 +56,8 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
                 stalledCts.Cancel();
         }, null, _stalledTimeout, _stalledTimeout);
 
+        ResultMessage? finalResult = null;
+
         try
         {
             var transport = BuildTransport(prompt, options);
@@ -68,15 +70,14 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
                     ProcessAssistantBlocks(assistant, progress, rollback, ref created, ref updated);
 
                 // RateLimitEvent / UnknownMessage / SystemMessage — silently skip.
-                // (rate-limit info is logged at the SDK level only, not shown in UI)
 
-                if (message is ResultMessage { IsError: true } error)
+                if (message is ResultMessage rm)
                 {
-                    await rollback.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-                    _postOpCleanup.Run();
-                    return new IngestResult(rawFileRelativePath, false, 0, 0,
-                        error.Result ?? "Claude returned an error",
-                        DateTime.UtcNow - startedAt);
+                    // Canonical end-of-turn signal. Stop iterating; do not rely
+                    // on the process closing stdout (which can also happen on
+                    // abnormal exit and would otherwise be misread as success).
+                    finalResult = rm;
+                    break;
                 }
             }
         }
@@ -101,6 +102,25 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
             await rollback.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
             _postOpCleanup.Run();
             throw;
+        }
+
+        // Abnormal exit: foreach ended (stdout closed) without seeing a result.
+        if (finalResult is null)
+        {
+            await rollback.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            _postOpCleanup.Run();
+            return new IngestResult(rawFileRelativePath, false, 0, 0,
+                "Claude закрыл stdout без финального result-сообщения",
+                DateTime.UtcNow - startedAt);
+        }
+
+        if (finalResult.IsError)
+        {
+            await rollback.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            _postOpCleanup.Run();
+            return new IngestResult(rawFileRelativePath, false, 0, 0,
+                finalResult.Result ?? "Claude returned an error",
+                DateTime.UtcNow - startedAt);
         }
 
         rollback.Commit();
@@ -140,6 +160,9 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
                     }
                 }
             }
+
+            if (message is ResultMessage)
+                break; // canonical end-of-turn
         }
 
         _postOpCleanup.Run();
@@ -231,6 +254,12 @@ public sealed class SdkClaudeAgent : IClaudeAgent, IAsyncDisposable
             Cwd = _vault.Path,
             SystemPrompt = systemPrompt,
             MaxTurns = maxTurns,
+            // ClaudeAgent.QueryAsync (one-shot) doesn't wire CanUseTool through
+            // the MCP bridge — only ClaudeSdkClient does — so Claude Code's own
+            // permission system would block writes. AcceptEdits auto-allows
+            // file edits; Bash is still blocked via DisallowedTools, and the
+            // vault boundary is enforced by CLAUDE.md + VaultPostOpCleanup.
+            PermissionMode = PermissionMode.AcceptEdits,
             DisallowedTools = new List<string> { "Bash" },
             CanUseTool = (toolName, input, _) =>
             {

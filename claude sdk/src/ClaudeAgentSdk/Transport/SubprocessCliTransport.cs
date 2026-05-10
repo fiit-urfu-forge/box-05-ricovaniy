@@ -152,7 +152,14 @@ public class SubprocessCliTransport : ITransport
         if (_options.PermissionMode.HasValue)
         {
             cmd.Add("--permission-mode");
-            cmd.Add(_options.PermissionMode.Value.ToString().ToLowerInvariant());
+            // CLI expects camelCase: acceptEdits, bypassPermissions, default, plan.
+            cmd.Add(_options.PermissionMode.Value switch
+            {
+                PermissionMode.AcceptEdits => "acceptEdits",
+                PermissionMode.BypassPermissions => "bypassPermissions",
+                PermissionMode.Plan => "plan",
+                _ => "default",
+            });
         }
 
         if (_options.ContinueConversation)
